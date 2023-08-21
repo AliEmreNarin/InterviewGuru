@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <script src="https://kit.fontawesome.com/f5fa04e0e8.js" crossorigin="anonymous"></script>
+    <link href="/static/styles.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/boxicons@latest/css/boxicons.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <script src="https://cdn.jsdelivr.net/npm/@google-cloud/speech@2.10.0"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@500;600&display=swap" rel="stylesheet">
+    <title>{% block title %}My Site{% endblock %}</title>
+</head>
+<body class="loginbody">
+    <div class="navigation">
+        <header>
+            <a href="#" class="logonav"><i class="ri-home-heart-fill"></i><span>Interview</span></a>
+            <ul class="navbar">
+                <li><a href="/">Home</a></li>
+                <li><a href="/pricing">Pricing</a></li>
+                <li><a href="/godashboard" class="active">Start Interview</a></li>
+                <li><a href="/contact" class="">Contact</a></li>
+            </ul>
+            <div class="main">
+                {% if is_authenticated %}
+                <a href="#" class="user"><i class="ri-user-3-fill"></i>{{ username }}</a>
+                <a href="/logout">Logout</a>
+                <div class="bx bx-menu" id="menu-icon"></div>
+                {% else %}
+                <a href="/login" class="useractive"><i class="ri-user-3-fill"></i>Login</a>
+                <a href="/register">Register</a>
+                {% endif %}
+            </div>
+        </header>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.4.1/jquery.min.js"></script>
+    <!-- CHAT BAR BLOCK -->
+    <div class="chat-bar-collapsible">
+        <button id="chat-button" type="button" class="collapsible">Good luck on your interview!
+            <i id="chat-icon" style="color: #fff;" class="fa fa-fw fa-comments-o"></i>
+        </button>
+        <div class="content" style="max-height: none;">
+            <div class="full-chat-block">
+                <div class="outer-container">
+                    <div id="camera-feed" class="camerafeed">
+                        <video id="camera-stream" autoplay playsinline></video>
+                    </div>
+                    <div class="chat-container">
+                        <div id="chatbox">
+                            <h5 id="chat-timestamp"></h5>
+                            <p id="botStarterMessage" class="botText"><span>Loading...</span></p>
+                        </div>
+                        <div class="chat-bar-input-block">
+                            <div id="userInput">
+                                <input id="textInput" class="input-box" type="text" name="msg"
+                                    placeholder="Tap 'Enter' to send a message">
+                                <p></p>
+                            </div>
+                            <div class="chat-bar-icons">
+                                <i id="chat-icon" style="color: #333;" class="fa fa-fw fa-send" onclick="sendButton()"></i>
+                                <i id="record-icon" style="color: #44ff00;" class="fa fa-fw fa-microphone" onclick="startRecording()"></i>
+                                <i id="stop-icon" style="color: #f90f0f;" class="fa fa-fw fa-microphone" onclick="sendvoice()"></i>
+                                <i id="open-camera" style="color: #44ff00;" class="fa-solid fa-camera"></i>
+                                <i id="close-camera" style="color: #f90f0f;" class="fa-solid fa-camera" onclick="closeCamera()"></i>
+                            </div>
+                        </div>
+                        <div id="chat-bar-bottom">
+                            <p></p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</body>
+<script>
+    const openCameraButton = document.getElementById("open-camera");
+    const cameraFeedContainer = document.getElementById("camera-feed");
+    const cameraStream = document.getElementById("camera-stream");
+
+    openCameraButton.addEventListener("click", async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            cameraStream.srcObject = stream;
+            cameraFeedContainer.style.display = "block";
+        } catch (error) {
+            console.error("Error accessing camera:", error);
+        }
+    });
+
+    function closeCamera() {
+        const stream = cameraStream.srcObject;
+        if (stream) {
+            const tracks = stream.getTracks();
+            tracks.forEach(track => track.stop());
+            cameraStream.srcObject = null;
+            cameraFeedContainer.style.display = "none";
+        }
+    }
+</script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-app.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-auth.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-firestore.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-storage.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.0.0/firebase-analytics.js"></script>
+
+
+<script>
+    const googleApiKey = 'AIzaSyAPLx10pzlkfMCp3Spj-EegzbDtN8zoUGc'; // Replace with your actual Google Cloud API key
+    
+    let recognition; // Declare recognition outside functions to make it accessible
+    
+    // Function to start voice recording
+    async function startRecording() {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const audioContext = new AudioContext();
+            const mediaStreamSource = audioContext.createMediaStreamSource(stream);
+            
+            // Create a new instance of SpeechRecognition
+            recognition = new webkitSpeechRecognition(); // Correct the constructor name
+            
+            // Set API key and other options
+            recognition.key = googleApiKey; // Use the appropriate property (apiKey)
+            recognition.continuous = true;
+            
+            recognition.onresult = function(event) {
+                const transcript = event.results[0][0].transcript;
+                // Display the transcript in the chat input box
+                document.getElementById('textInput').value = transcript;
+            };
+            
+            // Start recognition
+            recognition.start(mediaStreamSource);
+        } catch (error) {
+            console.error('Error starting recording:', error); // Use console.error for better visibility
+        }
+    }
+    
+    // Function to send the voice-recorded text
+    async function sendVoice() {
+        const textInput = document.getElementById('textInput'); // Define textInput
+        
+        const transcript = textInput.value; // Get transcript from input
+        
+        if (!transcript) {
+            console.log("No transcript available to send.");
+            return;
+        }
+        
+        try {
+            // Make an API call to Google's Cloud Speech-to-Text API
+            const apiUrl = `https://speech.googleapis.com/v1/speech:recognize?key=${googleApiKey}`;
+            const requestData = {
+                audio: {
+                    content: transcript
+                },
+                config: {
+                    encoding: "LINEAR16",
+                    sampleRateHertz: 16000,
+                    languageCode: "en-US"
+                }
+            };
+    
+            const response = await fetch(apiUrl, {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify(requestData)
+            });
+    
+            const data = await response.json();
+            const recognizedText = data.results[0].alternatives[0].transcript;
+    
+            // Use recognizedText as needed (e.g., for chatbot logic)
+            console.log("Recognized Text:", recognizedText);
+    
+            // Clear the input box
+            textInput.value = "";
+        } catch (error) {
+            console.error("Error sending transcript to API:", error); // Use console.error for better visibility
+        }
+    }
+</script>
+
+
+
+
+
+
+
+
+<script>
+    let menu = document.querySelector("#menu-icon");
+    let navbar = document.querySelector(".navbar");
+
+    menu.onclick = () => {
+        menu.classList.toggle("bx-x");
+        navbar.classList.toggle("open")
+    }
+
+</script>
+<script>
+
+async function getBotResponse(input) {
+  try {
+    const response = await fetch('/api/chat', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ input }),
+    });
+
+    if (!response.ok) {
+      throw new Error('Network response was not ok');
+    }
+
+    const data = await response.json();
+    const botResponse = data.response;
+    return botResponse;
+  } catch (error) {
+    console.error('Something unexpected happened:', error);
+    return 'Something Unexpected Happened';
+  }
+}
+
+function getTime() {
+    let today = new Date();
+    hours = today.getHours();
+    minutes = today.getMinutes();
+
+    if (hours < 10) {
+        hours = "0" + hours;
+    }
+
+    if (minutes < 10) {
+        minutes = "0" + minutes;
+    }
+
+    let time = hours + ":" + minutes;
+    return time;
+}
+// Gets the first message
+function firstBotMessage() {
+    let firstMessage = "Hey! Today, I will conduct your interview. Tell me please, how are you doing today?"
+    document.getElementById("botStarterMessage").innerHTML = '<p class="botText"><span>' + firstMessage + '</span></p>';
+
+    let time = getTime();
+
+    $("#chat-timestamp").append(time);
+    document.getElementById("userInput").scrollIntoView(false);
+}
+firstBotMessage();
+// Retrieves the response
+async function getHardResponse(userText) {
+    let botResponse = await getBotResponse(userText);
+    let botHtml = '<p class="botText"><span>' + botResponse + '</span></p>';
+    $("#chatbox").append(botHtml);
+
+    document.getElementById("chat-bar-bottom").scrollIntoView(true);
+}
+//Gets the text text from the input box and processes it
+function getResponse() {
+    let userText = $("#textInput").val();
+
+    if (userText == "") {
+        userText = "Hello!";
+    }
+
+    let userHtml = '<p class="userText"><span>' + userText + '</span></p>';
+
+    $("#textInput").val("");
+    $("#chatbox").append(userHtml);
+    document.getElementById("chat-bar-bottom").scrollIntoView(true);
+
+    setTimeout(() => {
+        getHardResponse(userText);
+    }, 1000)
+
+}
+// Handles sending text via button clicks
+function buttonSendText(sampleText) {
+    let userHtml = '<p class="userText"><span>' + sampleText + '</span></p>';
+
+    $("#textInput").val("");
+    $("#chatbox").append(userHtml);
+    document.getElementById("chat-bar-bottom").scrollIntoView(true);
+
+    //Uncomment this if you want the bot to respond to this buttonSendText event
+    // setTimeout(() => {
+    //     getHardResponse(sampleText);
+    // }, 1000)
+}
+function sendButton() {
+    getResponse();
+}
+// Press enter to send a message
+$("#textInput").keypress(function (e) {
+    if (e.which == 13) {
+        getResponse();
+    }
+});
+</script>
+
+</html>
