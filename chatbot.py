@@ -1,6 +1,6 @@
 import openai
 
-openai.api_key = "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"
+openai.api_key = "KEY HERE"
 
 job = ""
 company = ""
