@@ -38,4 +38,3 @@ Note: My chatbot can only answer 3 questions in a minute because of the api rest
 
 InterviewGuru allows you to practice interview questions, view pricing details, and find contact information for further inquiries.
 
-https://youtu.be/02X0TzrgCIw
